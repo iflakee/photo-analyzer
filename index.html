@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura — Smart Photo Vault</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- GSAP Animation Engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <!-- Exif.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+  <!-- JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Базовые переменные тем */
+    :root[data-theme="dark"] {
+      --bg-base: #060913;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --glass-nav: rgba(10, 15, 29, 0.78);
+      --glass-surface: rgba(16, 24, 46, 0.65);
+      --glass-card: rgba(22, 33, 62, 0.5);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --accent-primary: #6366f1;
+      --accent-gradient: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+      --accent-glow: rgba(99, 102, 241, 0.35);
+      --card-hover-border: rgba(129, 140, 248, 0.5);
+    }
+
+    :root[data-theme="light"] {
+      --bg-base: #f1f5f9;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --glass-nav: rgba(255, 255, 255, 0.85);
+      --glass-surface: rgba(255, 255, 255, 0.7);
+      --glass-card: rgba(255, 255, 255, 0.85);
+      --glass-border: rgba(15, 23, 42, 0.08);
+      --accent-primary: #4f46e5;
+      --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      --accent-glow: rgba(79, 70, 229, 0.2);
+      --card-hover-border: rgba(79, 70, 229, 0.45);
+    }
+
+    :root[data-theme="sunset"] {
+      --bg-base: #140b18;
+      --text-main: #fff1f2;
+      --text-muted: #fda4af;
+      --glass-nav: rgba(30, 14, 36, 0.82);
+      --glass-surface: rgba(43, 18, 51, 0.6);
+      --glass-card: rgba(56, 23, 66, 0.55);
+      --glass-border: rgba(251, 113, 133, 0.15);
+      --accent-primary: #f43f5e;
+      --accent-gradient: linear-gradient(135deg, #f43f5e 0%, #fb923c 60%, #facc15 100%);
+      --accent-glow: rgba(244, 63, 94, 0.4);
+      --card-hover-border: rgba(251, 146, 60, 0.55);
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      transition: background-color 0.8s cubic-bezier(0.16, 1, 0.3, 1), color 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-nav-bar {
+      background: var(--glass-nav);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-color: var(--glass-border);
+    }
+
+    .glass-box {
+      background: var(--glass-surface);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--glass-border);
+    }
+
+    .glass-photo-card {
+      background: var(--glass-card);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--glass-border);
+      transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.6s ease;
+    }
+
+    .glass-photo-card:hover {
+      transform: translateY(-8px) scale(1.015);
+      border-color: var(--card-hover-border);
+      box-shadow: 0 24px 45px -12px var(--accent-glow);
+    }
+
+    .btn-gradient-accent {
+      background: var(--accent-gradient);
+      box-shadow: 0 10px 25px -6px var(--accent-glow);
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease, filter 0.4s ease;
+    }
+    .btn-gradient-accent:hover {
+      filter: brightness(1.08);
+      transform: translateY(-2px);
+    }
+    .btn-gradient-accent:active {
+      transform: translateY(1px) scale(0.98);
+    }
+
+    /* Мягкий кастомный скроллбар */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.45);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen selection:bg-indigo-500 selection:text-white pb-36">
+
+  <!-- Header Navigation -->
+  <header class="sticky top-0 z-40 glass-nav-bar border-b py-5 px-6 md:px-14 flex flex-col md:flex-row md:items-center justify-between gap-5 transition-colors duration-700">
+    <!-- Brand -->
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl flex items-center justify-center btn-gradient-accent shadow-xl">
+        <i data-lucide="layers" class="w-7 h-7 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-indigo-200 to-indigo-400" id="brandTitle">
+          Aura Vault
+        </h1>
+        <p class="text-sm font-medium opacity-75" id="brandTagline" style="color: var(--text-muted)">
+          Умный локальный органайзер медиа
+        </p>
+      </div>
+    </div>
+
+    <!-- Quick Stats & Settings Switchers -->
+    <div class="flex flex-wrap items-center gap-3 md:gap-5">
+      <!-- Photos Count Badge -->
+      <div id="statsBadge" class="hidden text-sm font-semibold px-5 py-2.5 rounded-2xl border glass-box flex items-center gap-2">
+        <span id="badgeUploadedLabel">Загружено:</span>
+        <span id="photoCount" class="text-indigo-400 font-bold text-base">0</span>
+      </div>
+
+      <!-- Language Selector -->
+      <div class="flex items-center p-1 rounded-2xl border glass-box">
+        <button id="langRuBtn" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-sm">
+          RU
+        </button>
+        <button id="langEnBtn" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white">
+          EN
+        </button>
+      </div>
+
+      <!-- Theme Selector Dropdown / Buttons -->
+      <div class="flex items-center gap-1.5 p-1 rounded-2xl border glass-box" id="themeButtons">
+        <button data-set-theme="dark" title="Dark OLED" class="theme-btn p-2 rounded-xl text-xs font-semibold transition-all bg-white/10 text-white shadow-sm flex items-center gap-1">
+          <i data-lucide="moon" class="w-4 h-4"></i>
+        </button>
+        <button data-set-theme="light" title="Clean Light" class="theme-btn p-2 rounded-xl text-xs font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-1">
+          <i data-lucide="sun" class="w-4 h-4"></i>
+        </button>
+        <button data-set-theme="sunset" title="Warm Sunset" class="theme-btn p-2 rounded-xl text-xs font-semibold transition-all text-slate-400 hover:text-white flex items-center gap-1">
+          <i data-lucide="flame" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Download All ZIP Button -->
+      <button id="downloadAllBtn" class="hidden items-center gap-3 btn-gradient-accent text-white text-sm font-bold px-6 py-3 rounded-2xl cursor-pointer">
+        <i data-lucide="folder-down" class="w-5 h-5"></i>
+        <span id="btnDownloadAllText">Скачать все папки (.zip)</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 md:px-14 pt-12">
+
+    <!-- Hero / Drag-and-Drop Area -->
+    <div id="dropzone" class="glass-box rounded-[2.5rem] p-12 md:p-16 border-2 border-dashed hover:border-indigo-500/70 transition-all duration-700 cursor-pointer text-center relative overflow-hidden group">
+      <input type="file" id="fileInput" multiple accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer z-10">
+      
+      <div class="flex flex-col items-center justify-center gap-6 pointer-events-none">
+        <div class="w-24 h-24 rounded-3xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all duration-700 shadow-2xl">
+          <i data-lucide="cloud-upload" class="w-12 h-12"></i>
+        </div>
+        <div class="space-y-2">
+          <h2 id="dropzoneTitle" class="text-2xl md:text-4xl font-extrabold tracking-tight">
+            Перетащите фотографии сюда
+          </h2>
+          <p id="dropzoneSubtitle" class="text-base md:text-lg max-w-2xl mx-auto opacity-75 font-normal" style="color: var(--text-muted)">
+            Поддержка любых форматов (JPG, PNG, WEBP). Все вычисления, анализ и сжатие в ZIP происходят локально прямо в браузере.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 px-5 py-2 rounded-full border text-xs font-semibold uppercase tracking-wider opacity-60" style="border-color: var(--glass-border)">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+          <span id="privacyNotice">100% приватность без передачи на сервер</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Grouping & Controls Bar -->
+    <div id="controlsBar" class="mt-12 glass-box rounded-3xl p-6 md:p-8 border hidden opacity-0">
+      <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+        
+        <!-- Criteria Selector -->
+        <div class="space-y-3">
+          <span class="text-xs uppercase font-extrabold tracking-widest flex items-center gap-2 opacity-80" style="color: var(--text-muted)">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4 text-indigo-400"></i>
+            <span id="groupingLabel">Группировка по папкам:</span>
+          </span>
+          <div class="flex flex-wrap gap-2.5" id="criteriaButtons">
+            <button class="crit-btn active px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all bg-indigo-600 text-white shadow-lg shadow-indigo-600/30" data-group="events">
+              ✈️ <span class="crit-label" data-i18n="events">Поездки и события</span>
+            </button>
+            <button class="crit-btn px-5 py-2.5 rounded-2xl text-sm font-semibold border text-slate-400 hover:text-white transition-all" data-group="year-month" style="border-color: var(--glass-border)">
+              📅 <span class="crit-label" data-i18n="yearMonth">Год и месяц</span>
+            </button>
+            <button class="crit-btn px-5 py-2.5 rounded-2xl text-sm font-semibold border text-slate-400 hover:text-white transition-all" data-group="exact-date" style="border-color: var(--glass-border)">
+              📆 <span class="crit-label" data-i18n="exactDate">По дням</span>
+            </button>
+            <button class="crit-btn px-5 py-2.5 rounded-2xl text-sm font-semibold border text-slate-400 hover:text-white transition-all" data-group="vibe" style="border-color: var(--glass-border)">
+              🎨 <span class="crit-label" data-i18n="palette">Палитра и атмосфера</span>
+            </button>
+            <button class="crit-btn px-5 py-2.5 rounded-2xl text-sm font-semibold border text-slate-400 hover:text-white transition-all" data-group="aspect" style="border-color: var(--glass-border)">
+              📐 <span class="crit-label" data-i18n="aspect">Ориентация кадра</span>
+            </button>
+            <button class="crit-btn px-5 py-2.5 rounded-2xl text-sm font-semibold border text-slate-400 hover:text-white transition-all" data-group="format" style="border-color: var(--glass-border)">
+              📁 <span class="crit-label" data-i18n="format">Формат файлов</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Folder Count Tag -->
+        <div class="self-start xl:self-center">
+          <div id="foldersCounterTag" class="px-5 py-2.5 rounded-2xl text-sm font-bold border flex items-center gap-2" style="background: rgba(99, 102, 241, 0.12); color: #818cf8; border-color: rgba(99, 102, 241, 0.25)">
+            <i data-lucide="folder-tree" class="w-4 h-4"></i>
+            <span id="foldersCountText">Сформировано папок: 0</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Dynamic Folders Container -->
+    <div id="foldersContainer" class="mt-12 space-y-14">
+      <!-- Generated folder groups with photos and download buttons will appear here -->
+    </div>
+
+  </main>
+
+  <!-- Fullscreen Modal / Lightbox -->
+  <div id="lightbox" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-2xl opacity-0 pointer-events-none transition-opacity duration-700 flex items-center justify-center p-6 md:p-12">
+    <button id="closeLightbox" class="absolute top-8 right-8 p-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white transition-all">
+      <i data-lucide="x" class="w-7 h-7"></i>
+    </button>
+    <div class="max-w-6xl max-h-[85vh] flex flex-col items-center">
+      <img id="lightboxImg" src="" alt="Full view" class="max-h-[75vh] w-auto rounded-3xl shadow-2xl object-contain border" style="border-color: rgba(255, 255, 255, 0.1)">
+      <div id="lightboxInfo" class="mt-6 text-center text-base md:text-lg font-medium text-slate-200"></div>
+    </div>
+  </div>
+
+  <script>
+    // Словарь локализации (RU / EN)
+    const i18n = {
+      ru: {
+        brandTitle: "Aura Vault",
+        brandTagline: "Умный локальный органайзер медиа",
+        uploadedLabel: "Загружено:",
+        btnDownloadAll: "Скачать все папки (.zip)",
+        archiving: "Архивация...",
+        dropzoneTitle: "Перетащите фотографии сюда",
+        dropzoneSubtitle: "Поддержка любых форматов (JPG, PNG, WEBP). Все вычисления, анализ и сжатие в ZIP происходят локально прямо в браузере.",
+        privacyNotice: "100% приватность без передачи на сервер",
+        groupingLabel: "Группировка по папкам:",
+        events: "Поездки и события",
+        yearMonth: "Год и месяц",
+        exactDate: "По дням",
+        palette: "Палитра и атмосфера",
+        aspect: "Ориентация кадра",
+        format: "Формат файлов",
+        foldersCount: "Сформировано папок: {n}",
+        photosCount: "{n} фотографий",
+        downloadFolderBtn: "Скачать эту папку (.zip)",
+        viewCard: "Просмотр",
+        tripPrefix: "Поездка",
+        aspectStories: "Stories (Вертикальные)",
+        aspectLandscape: "Пейзаж (Горизонтальные)",
+        aspectSquare: "Квадратные",
+        vibeDark: "Ночные и тёмные кадры",
+        vibeBright: "Светлые и воздушные",
+        vibeGreen: "Природа и зелень",
+        vibeWarm: "Тёплые закатные тона",
+        vibeCool: "Холодные и морские оттенки",
+        vibeNeutral: "Нейтральная палитра",
+        formatPrefix: "Формат",
+        localeDate: 'ru-RU'
+      },
+      en: {
+        brandTitle: "Aura Vault",
+        brandTagline: "Smart Local Media Organizer",
+        uploadedLabel: "Uploaded:",
+        btnDownloadAll: "Download All Folders (.zip)",
+        archiving: "Archiving...",
+        dropzoneTitle: "Drag & Drop Photos Here",
+        dropzoneSubtitle: "Supports JPG, PNG, WEBP. All processing, clustering, and ZIP archiving take place locally in your browser.",
+        privacyNotice: "100% Private — Client-side only",
+        groupingLabel: "Group Into Folders By:",
+        events: "Trips & Events",
+        yearMonth: "Year & Month",
+        exactDate: "By Date",
+        palette: "Palette & Vibe",
+        aspect: "Aspect Ratio",
+        format: "File Extension",
+        foldersCount: "Folders Created: {n}",
+        photosCount: "{n} photos",
+        downloadFolderBtn: "Download This Folder (.zip)",
+        viewCard: "Inspect",
+        tripPrefix: "Trip",
+        aspectStories: "Stories (Portrait)",
+        aspectLandscape: "Landscape",
+        aspectSquare: "Square",
+        vibeDark: "Night & Low-Light",
+        vibeBright: "Bright & Airy",
+        vibeGreen: "Nature & Greenery",
+        vibeWarm: "Warm Sunset Hues",
+        vibeCool: "Cool & Oceanic Tones",
+        vibeNeutral: "Neutral Palette",
+        formatPrefix: "Files",
+        localeDate: 'en-US'
+      }
+    };
+
+    let currentLang = localStorage.getItem('aura_lang') || 'ru';
+    let currentTheme = localStorage.getItem('aura_theme') || 'dark';
+
+    let photos = [];
+    let activeGrouping = 'events';
+    let currentFolderStructure = {};
+
+    // Элементы интерфейса
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const controlsBar = document.getElementById('controlsBar');
+    const foldersContainer = document.getElementById('foldersContainer');
+    const statsBadge = document.getElementById('statsBadge');
+    const photoCount = document.getElementById('photoCount');
+    const foldersCountText = document.getElementById('foldersCountText');
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    const lightboxInfo = document.getElementById('lightboxInfo');
+    const closeLightbox = document.getElementById('closeLightbox');
+
+    // Инициализация темы
+    function applyTheme(theme) {
+      currentTheme = theme;
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('aura_theme', theme);
+
+      document.querySelectorAll('.theme-btn').forEach(btn => {
+        if (btn.dataset.setTheme === theme) {
+          btn.classList.add('bg-white/10', 'text-white', 'shadow-sm');
+          btn.classList.remove('text-slate-400');
+        } else {
+          btn.classList.remove('bg-white/10', 'text-white', 'shadow-sm');
+          btn.classList.add('text-slate-400');
+        }
+      });
+    }
+
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.addEventListener('click', () => applyTheme(btn.dataset.setTheme));
+    });
+
+    // Инициализация языка
+    function applyLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('aura_lang', lang);
+      const dict = i18n[lang];
+
+      document.getElementById('brandTitle').innerText = dict.brandTitle;
+      document.getElementById('brandTagline').innerText = dict.brandTagline;
+      document.getElementById('badgeUploadedLabel').innerText = dict.uploadedLabel;
+      document.getElementById('btnDownloadAllText').innerText = dict.btnDownloadAll;
+      document.getElementById('dropzoneTitle').innerText = dict.dropzoneTitle;
+      document.getElementById('dropzoneSubtitle').innerText = dict.dropzoneSubtitle;
+      document.getElementById('privacyNotice').innerText = dict.privacyNotice;
+      document.getElementById('groupingLabel').innerText = dict.groupingLabel;
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.dataset.i18n;
+        if (dict[key]) el.innerText = dict[key];
+      });
+
+      const ruBtn = document.getElementById('langRuBtn');
+      const enBtn = document.getElementById('langEnBtn');
+      if (lang === 'ru') {
+        ruBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-sm";
+        enBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white";
+      } else {
+        enBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-indigo-600 text-white shadow-sm";
+        ruBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white";
+      }
+
+      if (photos.length > 0) {
+        renderFolders();
+      }
+    }
+
+    document.getElementById('langRuBtn').addEventListener('click', () => applyLanguage('ru'));
+    document.getElementById('langEnBtn').addEventListener('click', () => applyLanguage('en'));
+
+    // Стартовая загрузка настроек
+    applyTheme(currentTheme);
+    applyLanguage(currentLang);
+    lucide.createIcons();
+
+    // Drag-and-drop анимации
+    ['dragenter', 'dragover'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        gsap.to(dropzone, { borderColor: '#818cf8', scale: 1.01, duration: 0.5, ease: 'power2.out' });
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(name => {
+      dropzone.addEventListener(name, (e) => {
+        e.preventDefault();
+        gsap.to(dropzone, { borderColor: '', scale: 1.0, duration: 0.5, ease: 'power2.out' });
+      });
+    });
+
+    fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+    dropzone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
+
+    async function handleFiles(files) {
+      if (!files.length) return;
+
+      for (const file of files) {
+        if (!file.type.startsWith('image/')) continue;
+
+        const url = URL.createObjectURL(file);
+        const metadata = await extractExif(file);
+        const visual = await analyzeImageAttributes(url);
+
+        const date = metadata.date || new Date(file.lastModified);
+        const extension = file.name.split('.').pop().toUpperCase() || 'IMG';
+
+        photos.push({
+          id: Math.random().toString(36).substring(7),
+          file,
+          url,
+          name: file.name,
+          size: file.size,
+          extension,
+          date,
+          aspectKey: visual.aspectKey,
+          vibeKey: visual.vibeKey
+        });
+      }
+
+      statsBadge.classList.remove('hidden');
+      statsBadge.classList.add('flex');
+      downloadAllBtn.classList.remove('hidden');
+      downloadAllBtn.classList.add('flex');
+
+      controlsBar.classList.remove('hidden');
+      gsap.to(controlsBar, { opacity: 1, duration: 1.0, ease: "power3.out" });
+
+      renderFolders();
+    }
+
+    // Извлечение EXIF даты
+    function extractExif(file) {
+      return new Promise((resolve) => {
+        EXIF.getData(file, function() {
+          const dateTime = EXIF.getTag(this, "DateTimeOriginal");
+          if (dateTime) {
+            const parts = dateTime.split(' ');
+            const dateParts = parts[0].split(':');
+            const timeParts = parts[1].split(':');
+            const date = new Date(dateParts[0], dateParts[1] - 1, dateParts[2], timeParts[0], timeParts[1], timeParts[2]);
+            resolve({ date });
+          } else {
+            resolve({ date: null });
+          }
+        });
+      });
+    }
+
+    // Цветовой и пропорциональный анализ через Canvas
+    function analyzeImageAttributes(url) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.src = url;
+        img.onload = () => {
+          let aspectKey = 'aspectLandscape';
+          const ratio = img.width / img.height;
+          if (ratio < 0.85) aspectKey = 'aspectStories';
+          else if (ratio >= 0.85 && ratio <= 1.15) aspectKey = 'aspectSquare';
+
+          const canvas = document.createElement('canvas');
+          canvas.width = 16;
+          canvas.height = 16;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, 16, 16);
+          const data = ctx.getImageData(0, 0, 16, 16).data;
+
+          let r = 0, g = 0, b = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            r += data[i];
+            g += data[i + 1];
+            b += data[i + 2];
+          }
+          const count = data.length / 4;
+          r = r / count;
+          g = g / count;
+          b = b / count;
+
+          let vibeKey = 'vibeNeutral';
+          const brightness = (r + g + b) / 3;
+
+          if (brightness < 60) {
+            vibeKey = 'vibeDark';
+          } else if (brightness > 200) {
+            vibeKey = 'vibeBright';
+          } else if (g > r + 15 && g > b + 15) {
+            vibeKey = 'vibeGreen';
+          } else if (r > b + 25 && r > g) {
+            vibeKey = 'vibeWarm';
+          } else if (b > r + 20) {
+            vibeKey = 'vibeCool';
+          }
+
+          resolve({ aspectKey, vibeKey });
+        };
+        img.onerror = () => {
+          resolve({ aspectKey: 'aspectLandscape', vibeKey: 'vibeNeutral' });
+        };
+      });
+    }
+
+    function buildGrouping() {
+      const dict = i18n[currentLang];
+      const groups = {};
+
+      if (activeGrouping === 'year-month') {
+        photos.forEach(p => {
+          const key = p.date.toLocaleDateString(dict.localeDate, { year: 'numeric', month: 'long' });
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(p);
+        });
+      } else if (activeGrouping === 'exact-date') {
+        photos.forEach(p => {
+          const key = p.date.toLocaleDateString(dict.localeDate, { year: 'numeric', month: 'long', day: 'numeric' });
+          if (!groups[key]) groups[key] = [];
+          groups[key].push(p);
+        });
+      } else if (activeGrouping === 'events') {
+        const sorted = [...photos].sort((a, b) => a.date - b.date);
+        let cluster = [];
+        let tripIdx = 1;
+
+        sorted.forEach(photo => {
+          if (!cluster.length) {
+            cluster.push(photo);
+          } else {
+            const prev = cluster[cluster.length - 1];
+            const diffDays = Math.abs(photo.date - prev.date) / (1000 * 60 * 60 * 24);
+            if (diffDays <= 2.5) {
+              cluster.push(photo);
+            } else {
+              const name = formatClusterName(cluster, tripIdx++);
+              groups[name] = cluster;
+              cluster = [photo];
+            }
+          }
+        });
+        if (cluster.length) {
+          const name = formatClusterName(cluster, tripIdx);
+          groups[name] = cluster;
+        }
+      } else if (activeGrouping === 'vibe') {
+        photos.forEach(p => {
+          const title = dict[p.vibeKey] || dict.vibeNeutral;
+          if (!groups[title]) groups[title] = [];
+          groups[title].push(p);
+        });
+      } else if (activeGrouping === 'aspect') {
+        photos.forEach(p => {
+          const title = dict[p.aspectKey] || dict.aspectLandscape;
+          if (!groups[title]) groups[title] = [];
+          groups[title].push(p);
+        });
+      } else if (activeGrouping === 'format') {
+        photos.forEach(p => {
+          const title = `${dict.formatPrefix} .${p.extension}`;
+          if (!groups[title]) groups[title] = [];
+          groups[title].push(p);
+        });
+      }
+
+      currentFolderStructure = groups;
+      return groups;
+    }
+
+    function formatClusterName(cluster, idx) {
+      const dict = i18n[currentLang];
+      const start = cluster[0].date.toLocaleDateString(dict.localeDate, { day: 'numeric', month: 'short' });
+      const end = cluster[cluster.length - 1].date.toLocaleDateString(dict.localeDate, { day: 'numeric', month: 'short', year: 'numeric' });
+      const dateRange = start === end ? start : `${start} — ${end}`;
+      return `${dict.tripPrefix} ${idx} (${dateRange})`;
+    }
+
+    function renderFolders() {
+      const dict = i18n[currentLang];
+      photoCount.innerText = photos.length;
+      foldersContainer.innerHTML = '';
+
+      const groups = buildGrouping();
+      const folderNames = Object.keys(groups);
+      foldersCountText.innerText = dict.foldersCount.replace('{n}', folderNames.length);
+
+      folderNames.forEach((folderName) => {
+        const folderPhotos = groups[folderName];
+
+        const folderBox = document.createElement('div');
+        folderBox.className = 'folder-group-block glass-box rounded-[2.2rem] p-7 md:p-10 border transition-all duration-700';
+
+        // Header папки
+        const header = document.createElement('div');
+        header.className = 'flex flex-wrap items-center justify-between gap-6 mb-8 pb-6 border-b';
+        header.style.borderColor = 'var(--glass-border)';
+        header.innerHTML = `
+          <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center border" style="background: rgba(99, 102, 241, 0.12); color: #818cf8; border-color: rgba(99, 102, 241, 0.25)">
+              <i data-lucide="folder" class="w-7 h-7"></i>
+            </div>
+            <div>
+              <h3 class="text-xl md:text-2xl font-extrabold tracking-tight">${folderName}</h3>
+              <p class="text-sm font-medium opacity-75 mt-0.5" style="color: var(--text-muted)">
+                ${dict.photosCount.replace('{n}', folderPhotos.length)}
+              </p>
+            </div>
+          </div>
+          <button class="download-folder-btn flex items-center gap-3 border px-5 py-3 rounded-2xl text-sm font-bold transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer glass-box" data-folder="${folderName}">
+            <i data-lucide="download" class="w-4 h-4 text-indigo-400"></i>
+            <span>${dict.downloadFolderBtn}</span>
+          </button>
+        `;
+
+        // Сетка фото
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-7';
+
+        folderPhotos.forEach(photo => {
+          const card = document.createElement('div');
+          card.className = 'glass-photo-card rounded-[1.8rem] overflow-hidden cursor-pointer flex flex-col group';
+          card.onclick = () => openLightbox(photo);
+
+          const formattedDate = photo.date.toLocaleDateString(dict.localeDate, {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          });
+
+          card.innerHTML = `
+            <div class="relative aspect-[4/3] overflow-hidden bg-slate-900/60">
+              <img src="${photo.url}" alt="${photo.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-4">
+                <span class="text-xs font-bold text-white flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/40 backdrop-blur-md">
+                  <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i> ${dict.viewCard}
+                </span>
+              </div>
+            </div>
+            <div class="p-5 flex flex-col gap-1.5">
+              <p class="font-bold text-sm truncate" title="${photo.name}">${photo.name}</p>
+              <div class="flex items-center justify-between text-xs font-semibold opacity-75 mt-1" style="color: var(--text-muted)">
+                <span>${formattedDate}</span>
+                <span class="px-2.5 py-0.5 rounded-lg border text-[11px]" style="border-color: var(--glass-border)">
+                  ${(photo.size / (1024 * 1024)).toFixed(1)} MB • ${photo.extension}
+                </span>
+              </div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+
+        folderBox.appendChild(header);
+        folderBox.appendChild(grid);
+        foldersContainer.appendChild(folderBox);
+
+        // Скачивание одной папки
+        folderBox.querySelector('.download-folder-btn').addEventListener('click', (e) => {
+          e.stopPropagation();
+          downloadSingleFolder(folderName, folderPhotos);
+        });
+      });
+
+      lucide.createIcons();
+
+      // Медленная и плавная анимация появления через GSAP
+      gsap.fromTo(".folder-group-block", 
+        { opacity: 0, y: 40 },
+        { 
+          opacity: 1, 
+          y: 0, 
+          duration: 0.9, 
+          stagger: 0.14, 
+          ease: "power3.out" 
+        }
+      );
+    }
+
+    // Скачивание отдельной папки
+    async function downloadSingleFolder(folderName, folderPhotos) {
+      const zip = new JSZip();
+      const folder = zip.folder(sanitizeName(folderName));
+
+      for (const p of folderPhotos) {
+        folder.file(p.name, p.file);
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      triggerDownload(blob, `${sanitizeName(folderName)}.zip`);
+    }
+
+    // Скачивание всей структуры папок
+    downloadAllBtn.addEventListener('click', async () => {
+      const dict = i18n[currentLang];
+      const originalText = document.getElementById('btnDownloadAllText').innerText;
+      downloadAllBtn.disabled = true;
+      document.getElementById('btnDownloadAllText').innerText = dict.archiving;
+
+      const zip = new JSZip();
+      for (const [folderName, folderPhotos] of Object.entries(currentFolderStructure)) {
+        const sub = zip.folder(sanitizeName(folderName));
+        for (const p of folderPhotos) {
+          sub.file(p.name, p.file);
+        }
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      triggerDownload(blob, `Aura_Vault_Sorted_${Date.now()}.zip`);
+
+      downloadAllBtn.disabled = false;
+      document.getElementById('btnDownloadAllText').innerText = originalText;
+    });
+
+    function sanitizeName(str) {
+      return str.replace(/[/\\?%*:|"<>]/g, '_');
+    }
+
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Переключение кнопок группировки
+    document.querySelectorAll('.crit-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.crit-btn').forEach(b => {
+          b.classList.remove('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-600/30');
+          b.classList.add('text-slate-400');
+        });
+        btn.classList.add('bg-indigo-600', 'text-white', 'shadow-lg', 'shadow-indigo-600/30');
+        btn.classList.remove('text-slate-400');
+
+        activeGrouping = btn.dataset.group;
+        renderFolders();
+      });
+    });
+
+    // Плавный Lightbox
+    function openLightbox(photo) {
+      const dict = i18n[currentLang];
+      lightboxImg.src = photo.url;
+      lightboxInfo.innerHTML = `<span class="font-extrabold text-white">${photo.name}</span> &bull; <span class="opacity-80">${photo.date.toLocaleString(dict.localeDate)}</span>`;
+      
+      lightbox.classList.remove('pointer-events-none');
+      gsap.to(lightbox, { opacity: 1, duration: 0.8, ease: "power3.out" });
+      gsap.fromTo(lightboxImg, { scale: 0.9, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.9, ease: "expo.out" });
+    }
+
+    function hideLightbox() {
+      gsap.to(lightbox, { 
+        opacity: 0, 
+        duration: 0.7, 
+        ease: "power3.out", 
+        onComplete: () => {
+          lightbox.classList.add('pointer-events-none');
+        } 
+      });
+    }
+
+    closeLightbox.addEventListener('click', hideLightbox);
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) hideLightbox();
+    });
+  </script>
+</body>
+</html>
